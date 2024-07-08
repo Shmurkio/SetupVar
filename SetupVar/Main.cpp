@@ -1,116 +1,166 @@
 #include "SetupVar.h"
 
 GUID gEfiAmiSetupVariableGuid = EFI_AMI_SETUP_VARIABLE_GUID;
-const wchar_t* const gEfiAmiSetupVariableCharName = L"Setup";
+GUID gEfiInsydeH2OSetupVariableGuid = EFI_INSYDEH2O_SETUP_VARIABLE_GUID;
+GUID gEfiPchSetupVariableGuid = EFI_PCH_SETUP_VARIABLE_GUID;
+GUID gEfiSaSetupVariableGuid = EFI_SA_SETUP_VARIABLE_GUID;
+GUID gEfiCpuSetupVariableGuid = EFI_CPU_SETUP_VARIABLE_GUID;
+GUID gEfiIntelSetupVariableGuid = EFI_INTEL_SETUP_VARIABLE_GUID;
+GUID gEfiSystemConfigVariableGuid = EFI_SYSTEM_CONFIG_VARIABLE_GUID;
+GUID gEfiAmiKekVariableGuid = EFI_AMI_KEK_VARIABLE_GUID;
+GUID gEfiAmiPkVariableGuid = EFI_AMI_PK_VARIABLE_GUID;
 
 int main(int ArgC, char *ArgV[]) {
 
-	if (ArgC != 3) {
-		std::cout << "Wrong syntax -> SetupVar.exe Offset Value" << std::endl;
-		return 1;
-	}
+    /* Print header */
 
-	/* Init variable name & GUID */
+    system("CLS");
 
-	UNICODE_STRING VariableName;
-	const wchar_t* const VariableCharName = gEfiAmiSetupVariableCharName;
-	GUID VariableGuid = gEfiAmiSetupVariableGuid;
+    printf("################################################################################\n");
+    printf("#                                                                              #\n");
+    printf("#                                  SetupVar 1.2                                #\n");
+    printf("#                                   by Shmurkio                                #\n");
+    printf("#                                                                              #\n");
+    printf("################################################################################\n\n");
 
-	RtlInitUnicodeString(&VariableName, VariableCharName);
 
-	/* Open the process token */
+    /* Check Argument count */
 
-	HANDLE HandleToken;
+    if (ArgC != 2 && ArgC != 4) {
+        printf("Syntax: SetupVar -VariableName Offset Value => Edit variable data\n");
+        printf("        SetupVar -VariableName              => Print variable data\n\n");
+        printf("Variable names:\n");
+        wprintf(L"- AmiSetup       (%s)\n", GuidToString(gEfiAmiSetupVariableGuid).c_str());
+        wprintf(L"- InsydeSetup    (%s)\n", GuidToString(gEfiInsydeH2OSetupVariableGuid).c_str());
+        wprintf(L"- PchSetup       (%s)\n", GuidToString(gEfiPchSetupVariableGuid).c_str());
+        wprintf(L"- SaSetup        (%s)\n", GuidToString(gEfiSaSetupVariableGuid).c_str());
+        wprintf(L"- CpuSetup       (%s)\n", GuidToString(gEfiCpuSetupVariableGuid).c_str());
+        wprintf(L"- IntelSetup     (%s)\n", GuidToString(gEfiIntelSetupVariableGuid).c_str());
+        wprintf(L"- SystemConfig   (%s)\n", GuidToString(gEfiSystemConfigVariableGuid).c_str());
+        wprintf(L"- AmiKek         (%s)\n", GuidToString(gEfiAmiKekVariableGuid).c_str());
+        wprintf(L"- AmiPk          (%s)\n", GuidToString(gEfiAmiPkVariableGuid).c_str());
+        return 1;
+    }
 
-	if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &HandleToken)) {
-		std::cerr << "OpenProcessToken error: " << GetLastError() << std::endl;
-		return 1;
-	}
+    /* Init variable name & GUID */
 
-	/* Enable the SeSystemEnvironmentPrivilege privilege */
+    UNICODE_STRING VariableName;
+    std::wstring VariableCharName;
+    GUID VariableGuid;
 
-	if (!SetPrivilege(HandleToken, SE_SYSTEM_ENVIRONMENT_NAME, TRUE)) {
-		std::cerr << "Failed to enable SeSystemEnvironmentPrivilege" << std::endl;
-		CloseHandle(HandleToken);
-		return 1;
-	}
+    if (!InitializeVariable(ArgV[1], VariableCharName, VariableGuid)) {
+        printf("Variable \"%s\" is not defined.", ArgV[1]);
+        return 2;
+    }
 
-	/* Prepare the buffer of the variable data to receive the value */
+    VariableName.Buffer = const_cast<wchar_t*>(VariableCharName.c_str());
+    VariableName.Length = static_cast<USHORT>(VariableCharName.length() * sizeof(wchar_t));
+    VariableName.MaximumLength = VariableName.Length + sizeof(wchar_t);
 
-	ULONG VariableLength = 4096;
-	BYTE VariableData[4096];
-	ULONG Attributes;
+    /* Open the process token */
 
-	/* Call the NtQuerySystemEnvironmentValueEx function */
+    HANDLE HandleToken;
 
-	NTSTATUS Status = NtQuerySystemEnvironmentValueEx(&VariableName, &VariableGuid, VariableData, &VariableLength, &Attributes);
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &HandleToken)) {
+        printf("OpenProcessToken error: %lu\n.", GetLastError());
+        return static_cast<int>(GetLastError());
+    }
 
-	if (Status != STATUS_SUCCESS) {
-		std::cerr << "NVRAM variable can't be read. Status: 0x" << std::hex << Status << std::endl;
-		CloseHandle(HandleToken);
-		return static_cast<int>(Status);
-	}
+    /* Enable the SeSystemEnvironmentPrivilege privilege */
 
-	/* Patch the VariableData */
+    if (!SetPrivilege(HandleToken, SE_SYSTEM_ENVIRONMENT_NAME, TRUE)) {
+        printf("Failed to enable SeSystemEnvironmentPrivilege.\n");
+        CloseHandle(HandleToken);
+        return 3;
+    }
 
-	int Offset;
-	BYTE Value;
+    /* Prepare the buffer of the variable data to receive the value */
 
-	try {
-		Offset = std::stoi(ArgV[1], nullptr, 16);
-		unsigned long parsedValue = std::stoul(ArgV[2], nullptr, 16);
+    ULONG VariableLength = 4096;
+    BYTE VariableData[4096];
+    ULONG Attributes;
 
-		if (parsedValue > 0xFF) {
-			std::cerr << "Value out of bounds" << std::endl;
-			CloseHandle(HandleToken);
-			return 1;
-		}
+    /* Call the NtQuerySystemEnvironmentValueEx function */
 
-		Value = static_cast<BYTE>(parsedValue);
-	}
-	catch (const std::invalid_argument&) {
-		std::cerr << "Invalid offset or value format" << std::endl;
-		CloseHandle(HandleToken);
-		return 1;
-	}
-	catch (const std::out_of_range&) {
-		std::cerr << "Offset or value out of range" << std::endl;
-		CloseHandle(HandleToken);
-		return 1;
-	}
+    NTSTATUS Status = NtQuerySystemEnvironmentValueEx(&VariableName, &VariableGuid, VariableData, &VariableLength, &Attributes);
 
-	if (Offset < 0 || Offset >= static_cast<int>(VariableLength)) {
-		std::cerr << "Offset out of bounds" << std::endl;
-		CloseHandle(HandleToken);
-		return 1;
-	}
+    if (Status != STATUS_SUCCESS) {
+        printf("NVRAM variable can't be read. Status: 0x%X.\n", Status);
+        return static_cast<int>(Status);
+    }
 
-	BYTE OrigValue = VariableData[Offset];
-	VariableData[Offset] = Value;
+    /* Check if it should only print the variable (3 args) */
 
-	/* Delete NVRAM variable */
+    if (ArgC == 2) {
+        wprintf(L"Name: %s\n", VariableName.Buffer);
+        wprintf(L"GUID: %s\n", GuidToString(VariableGuid).c_str());
+        printf("Size: 0x%X\n\n", VariableLength);
+        PrintHexData(VariableData, VariableLength);
+        CloseHandle(HandleToken);
+        return 0;
+    }
 
-	Status = NtSetSystemEnvironmentValueEx(&VariableName, &VariableGuid, 0, 0, Attributes);
+    /* Execute the command */
 
-	if (Status != STATUS_SUCCESS) {
-		std::cerr << "Failed to delete NVRAM variable. Status: 0x" << std::hex << Status << std::endl;
-		CloseHandle(HandleToken);
-		return static_cast<int>(Status);
-	}
+    int Offset;
+    BYTE Value;
 
-	/* Set modified variable */
+    try {
+        Offset = std::stoi(ArgV[2], nullptr, 16);
+        unsigned long ParsedValue = std::stoul(ArgV[3], nullptr, 16);
 
-	Status = NtSetSystemEnvironmentValueEx(&VariableName, &VariableGuid, VariableData, VariableLength, Attributes);
+        if (ParsedValue > 0xFF) {
+            printf("Value out of bounds.\n");
+            CloseHandle(HandleToken);
+            return 4;
+        }
 
-	if (Status != STATUS_SUCCESS) {
-		std::cerr << "Failed to set NVRAM variable. Status: 0x" << std::hex << Status << std::endl;
-	}
-	else {
-		std::cerr << "Set NVRAM variable: 0x" << std::hex << std::uppercase << static_cast<int>(OrigValue) << " -> 0x" << static_cast<int>(VariableData[Offset]) << std::endl;
-	}
+        Value = static_cast<BYTE>(ParsedValue);
+    }
+    catch (const std::invalid_argument&) {
+        printf("Invalid offset or value format.\n");
+        CloseHandle(HandleToken);
+        return 5;
+    }
+    catch (const std::out_of_range&) {
+        printf("Offset or value out of range.\n");
+        CloseHandle(HandleToken);
+        return 6;
+    }
 
-	CloseHandle(HandleToken);
+    if (Offset < 0 || Offset >= static_cast<int>(VariableLength)) {
+        printf("Offset out of bounds.\n");
+        CloseHandle(HandleToken);
+        return 7;
+    }
 
-	return static_cast<int>(Status);
+    BYTE OrigValue = VariableData[Offset];
+    VariableData[Offset] = Value;
+
+    /* Delete NVRAM variable */
+
+    Status = NtSetSystemEnvironmentValueEx(&VariableName, &VariableGuid, nullptr, 0, Attributes);
+
+    if (Status != STATUS_SUCCESS) {
+        printf("Failed to delete NVRAM variable. Status: 0x%X.\n", Status);
+        CloseHandle(HandleToken);
+        return static_cast<int>(Status);
+    }
+
+    /* Set modified variable */
+
+    Status = NtSetSystemEnvironmentValueEx(&VariableName, &VariableGuid, VariableData, VariableLength, Attributes);
+
+    if (Status != STATUS_SUCCESS) {
+        printf("Failed to set NVRAM variable. Status: 0x%X.\n", Status);
+        CloseHandle(HandleToken);
+        return static_cast<int>(Status);
+    }
+
+    wprintf(L"\"%s\", %s, 0x%X: 0x%X -> 0x%X\n", GuidToString(VariableGuid).c_str(), VariableName.Buffer, Offset, OrigValue, Value);
+
+    CloseHandle(HandleToken);
+
+    return 0;
 
 }
