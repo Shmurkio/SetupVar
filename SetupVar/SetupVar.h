@@ -29,7 +29,7 @@ void RtlInitUnicodeString(PUNICODE_STRING DestinationString, PCWSTR SourceString
 
 /* Convert GUID to string */
 
-std::wstring GuidToString(const GUID& Guid);
+std::wstring GuidToString(GUID Guid);
 
 /* Print variable data */
 

@@ -51,14 +51,16 @@ void RtlInitUnicodeString(PUNICODE_STRING DestinationString, PCWSTR SourceString
 
 }
 
-std::wstring GuidToString(const GUID& Guid) {
-    wchar_t Buffer[37];
+std::wstring GuidToString(GUID Guid) {
+    wchar_t Buffer[39];
 
     swprintf(Buffer, sizeof(Buffer) / sizeof(Buffer[0]),
-        L"%08lX-%04X-%04X-%04X-%012lX",
+        L"%08lX-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X",
         Guid.Data1, Guid.Data2, Guid.Data3,
-        (Guid.Data4[0] << 8) | Guid.Data4[1],
-        (Guid.Data4[2] << 24) | (Guid.Data4[3] << 16) | (Guid.Data4[4] << 8) | Guid.Data4[5] | (Guid.Data4[6] << 8) | (Guid.Data4[7]));
+        Guid.Data4[0], Guid.Data4[1],
+        Guid.Data4[2], Guid.Data4[3],
+        Guid.Data4[4], Guid.Data4[5],
+        Guid.Data4[6], Guid.Data4[7]);
 
     return std::wstring(Buffer);
 }
