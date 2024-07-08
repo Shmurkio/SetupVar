@@ -27,8 +27,9 @@ int main(int ArgC, char *ArgV[]) {
     /* Check Argument count */
 
     if (ArgC != 2 && ArgC != 4) {
-        printf("Syntax: SetupVar -VariableName Offset Value => Edit variable data\n");
-        printf("        SetupVar -VariableName              => Print variable data\n\n");
+        printf("Syntax:\n");
+        printf("SetupVar -VariableName Offset Value    => Edit variable data\n");
+        printf("SetupVar -VariableName                 => Print variable data\n\n");
         printf("Variable names:\n");
         wprintf(L"- AmiSetup       (%s)\n", GuidToString(gEfiAmiSetupVariableGuid).c_str());
         wprintf(L"- InsydeSetup    (%s)\n", GuidToString(gEfiInsydeH2OSetupVariableGuid).c_str());
