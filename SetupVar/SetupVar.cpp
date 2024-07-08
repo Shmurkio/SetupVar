@@ -6,7 +6,7 @@ bool SetPrivilege(HANDLE HandleToken, LPCTSTR LpszPrivilege, BOOL EnablePrivileg
     LUID Luid;
 
     if (!LookupPrivilegeValue(nullptr, LpszPrivilege, &Luid)) {
-        std::cerr << "LookupPrivilegeValue error: " << GetLastError() << std::endl;
+        printf("LookupPrivilegeValue error: %lu.\n", GetLastError());
         return false;
     }
 
@@ -21,12 +21,12 @@ bool SetPrivilege(HANDLE HandleToken, LPCTSTR LpszPrivilege, BOOL EnablePrivileg
     }
 
     if (!AdjustTokenPrivileges(HandleToken, false, &TokenPrivileges, sizeof(TOKEN_PRIVILEGES), nullptr, nullptr)) {
-        std::cerr << "AdjustTokenPrivileges error: " << GetLastError() << std::endl;
+        printf("AdjustTokenPrivileges error: %lu.\n", GetLastError());
         return false;
     }
 
     if (GetLastError() == ERROR_NOT_ALL_ASSIGNED) {
-        std::cerr << "The token does not have the specified privilege." << std::endl;
+        printf("The token does not have the specified privilege.\n");
         return false;
     }
 
